@@ -1,0 +1,438 @@
+CMS (Content Manajemen System) adalah sebuah perangkat lunak atau sistem yang mengatur konten pada situs web,
+bisa situs web yang berupa company profile, e-commerce, blog, forum, dan lainnya
+
+Strapi
+adalah CMS yang memiliki banyak fitur. seperti content type builder, graphQL, provider, email, authentication
+nah authentication ini ada di Strapi by design jadi kita tidak perlu install apa-apa lagi. kita tinggal pake aja
+dan endpoint nya sudah ada. jadi kita tinggal cari tahu endpoint nya apa kemudian data yang diperlukan untuk kita kirim ke
+endpoint tersebut itu apa
+
+authentication di Strapi ini dia basicnya pakai jsonwebtoken atau jwt. jadi cara kerja jwt itu misalnya kita mengirim data
+email dan password yang diinput oleh user ke server atau ke endpoint nya. nah Strapi akan mengecek apakah email dan passwordnya
+cocok atau tidak. kalo cocok dia akan create 1 token. nah token itu jwt. nah token itu akan dijadiin response ke usernya.
+
+nah setelah mendapatkan token. nantinya token ini yang akan kita gunakan untuk mengakses authentication routes 
+atau authentication resource. jadi resource-resource yang diprotect hanya bisa diakses ketika kita ngasih token 
+
+Strapi itu secara luas ada 2 jenis endpoint:
+1. public           : kita bisa mengakses sembarang. misalnya kita mau ngasih token atau enggak jadi tidak ada yang dibatasi
+2. authentication   : kita harus ngasih token jwt tadi yang kita generate atau yang si user tadi login. nah untuk mengakses
+                      endpoint-endpoint tadi yang termasuk ke lingkup authentication maka kita harus ngasih token.
+                      jadi token nya harus presistent artinya harus disimpan. karna nanti untuk dipake authentication resource
+                      makanya kita bisa simpan di cookie, localStorage
+
+selain itu Strapi memiliki fitur provider. dimana provider ini memungkinkan kita untuk memudahkan kita mengintegrasi third-party,
+service atau misalkan mau login with github, google, facebook. jadi nantinya kita provide client id, client secret
+kita bikin apps nya di facebook, di github
+
+=================================================================================================================================
+
+1. buat database
+membuat database dengan nama $strapi_auth_jwt
+
+2. instalasi strapi, nextjs dan tailwind css
+- install strapi di global
+$npm install -g create-strapi-app
+
+- membuat project baru strapi
+$npx create-strapi-app authjwt-strapi
+
+- instal nextjs
+$npx create-next-app strapi-auth-jwt
+
+- instal tailwind css dan plugin form
+$npm install -D tailwindcss postcss autoprefixer
+$npx tailwindcss init -p
+$npm install @tailwindcss/forms
+
+melakukan setting di tailwind.config.js untuk form
+module.exports = {
+  content: [
+    "./pages/**/*.{js,ts,jsx,tsx}",
+    "./components/**/*.{js,ts,jsx,tsx}",
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [
+      require('@tailwindcss/forms'),
+  ],
+}
+
+3. membuat new user admin di strapi
+
+4. membuat halaman register.js dan membuat file .env.local yaitu NEXT_PUBLIC_URL=http://localhost:1337
+supaya nanti dalam penulisan http://localhost:1337 diganti menjadi NEXT_PUBLIC_URL
+
+import Link from "next/link";
+import { useState } from "react";
+import nookies from 'nookies';
+
+export async function getServerSideProps(ctx) {
+  const cookies = nookies.get(ctx);
+  
+  if(cookies.token){
+      return {
+          redirect: {
+              destination: '/dashboard'
+          }
+      }
+  }
+  
+  return {
+    props: {},
+  }
+}
+
+export default function Register(){
+    const [success,setSuccess] = useState(false);
+    const [progress,setProgress] = useState(false);
+    const [fields,setFields] = useState({});
+
+    async function doRegister(e){
+        e.preventDefault();
+
+        setProgress(true);
+        const register = await fetch(`${process.env.NEXT_PUBLIC_URL}/api/auth/local/register`,{
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(fields)
+        });
+
+        const res = await register.json();
+
+        if(res.jwt){
+            setSuccess(true);
+            setFields({});
+            e.target.reset();
+        }
+        
+        setProgress(false);
+    }
+
+    function setValue(e){
+        e.preventDefault();
+
+        const name = e.target.getAttribute('name');
+        setFields({
+            ...fields,
+            [name]: e.target.value
+        });
+    }
+
+    return (
+        <div className="min-h-screen bg-gray-100 flex flex-col justify-center sm:py-12">
+         <div className="p-10 xs:p-0 mx-auto md:w-full md:max-w-md">
+            <h1 className="text-blue-500 font-bold text-center text-2xl mb-5 capitalize">Register your account</h1>
+            {success && (
+               <div className="text-center capitalize text-white bg-green-500 rounded mb-4 p-2">
+                  Congratulations! Your account has been registered.
+               </div>
+            )}
+            <div className="bg-white shadow w-full rounded-lg divide-y divide-gray-200">
+               <form onSubmit={doRegister} className="px-5 py-7 relative">
+                  {progress && (
+                     <div className="absolute inset-0 z-10 bg-white/50"></div>
+                  )}
+                  <label className="font-semibold text-sm text-gray-600 pb-1 block">Username</label>
+                  <input type="text" className="border rounded-lg px-3 py-2 mt-1 mb-5 text-sm w-full" name="username" onChange={setValue} />
+                  <label className="font-semibold text-sm text-gray-600 pb-1 block">E-mail</label>
+                  <input type="text" className="border rounded-lg px-3 py-2 mt-1 mb-5 text-sm w-full" name="email" onChange={setValue} />
+                  <label className="font-semibold text-sm text-gray-600 pb-1 block">Password</label>
+                  <input type="password" className="border rounded-lg px-3 py-2 mt-1 mb-5 text-sm w-full" name="password" onChange={setValue} />
+                  <button type="submit" disabled={progress} className="transition duration-200 bg-blue-500 hover:bg-blue-600 focus:bg-blue-700 focus:shadow-sm focus:ring-4 focus:ring-blue-500 focus:ring-opacity-50 text-white w-full py-2.5 rounded-lg text-sm shadow-sm hover:shadow-md font-semibold text-center inline-block">
+                     <span className="inline-block mr-2">Register</span>
+                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-4 h-4 inline-block">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                     </svg>
+                  </button>
+               </form>
+            </div>
+            <div className="py-5">
+               <div className="grid grid-cols-2 gap-1">
+                  <div className="text-center sm:text-left whitespace-nowrap">
+                     <button className="transition duration-200 mx-5 px-5 py-4 cursor-pointer font-normal text-sm rounded-lg text-gray-500 hover:bg-gray-200 focus:outline-none focus:bg-gray-300 focus:ring-2 focus:ring-gray-400 focus:ring-opacity-50 ring-inset">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-4 h-4 inline-block align-text-top">
+                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                        </svg>
+                        <Link href="/login"><a className="inline-block ml-1">Login Account</a></Link>
+                     </button>
+                  </div>
+               </div>
+            </div>
+         </div>
+      </div>
+    );
+}
+
+5. membuat halaman login.js dan install dependency nookies $npm install nookies
+
+import { useState } from "react";
+import Link from "next/link";
+import nookies from 'nookies';
+import Router from "next/router";
+
+export async function getServerSideProps(ctx) {
+  const cookies = nookies.get(ctx);
+
+  if(cookies.token){
+      return {
+          redirect: {
+              destination: '/dashboard'
+          }
+      }
+  }
+  
+  return {
+    props: {},
+  }
+}
+
+export default function Login(){
+    const [success, setSuccess] = useState(false);
+    const [progress, setprogress] = useState(false);
+    const [fields, setFields] = useState({});
+
+    async function doLogin(e){
+        e.preventDefault();
+
+        const login = await fetch(`${process.env.NEXT_PUBLIC_URL}/api/auth/local`,{
+            method: 'POST'
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(fields)
+        });
+
+        const res = await login.json();
+
+        if(res.jwt){
+            nookies.set(null, 'token', res.jwt);
+            Router.replace('/dashboard');
+            setFields({});
+            e.target.reset();
+        }
+
+        setProgress(false);
+    }
+
+    function setValue(e){
+        e.preventDefault();
+
+        const name = e.target.getAttribute('name');
+        setFields({
+            ...fields,
+            [name]: e.target.value
+        });
+    }
+
+    return (
+        <div className="min-h-screen bg-gray-100 flex flex-col justify-center sm:py-12">
+            <div className="p-10 xs:p-0 mx-auto md:w-full md:max-w-md">
+                <h1 className="text-blue-500 font-bold text-center text-2xl mb-5 capitalize">Login to your account</h1>
+                {success && (
+                    <div className="text-center capitalize text-white bg-green-500 rounded mb-4 p-2">
+                        you have successfully logged in
+                    </div>
+                )}
+                <div className="bg-white shadow w-full rounded-lg divide-y divide-gray-200">
+                    <form onSubmit={doLogin} className="px-5 py-7 relative">
+                        {progress && (
+                            <div className="absolute inset-0 z-10 bg-white/50"></div>
+                        )}
+                        <label className="font-semibold text-sm text-gray-600 pb-1 block">E-mail</label>
+                        <input type="text" className="border rounded-lg px-3 py-2 mt-1 mb-5 text-sm w-full" name="identifier" onChange={setValue} />
+                        <label className="font-semibold text-sm text-gray-600 pb-1 block">Password</label>
+                        <input type="password" className="border rounded-lg px-3 py-2 mt-1 mb-5 text-sm w-full" name="password" onChange={setValue} />
+                        <button type="submit" disabled={progress} className="transition duration-200 bg-blue-500 hover:bg-blue-600 focus:bg-blue-700 focus:shadow-sm focus:ring-4 focus:ring-blue-500 focus:ring-opacity-50 text-white w-full py-2.5 rounded-lg text-sm shadow-sm hover:shadow-md font-semibold text-center inline-block">
+                            <span className="inline-block mr-2">Login</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-4 h-4 inline-block">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                            </svg>
+                        </button>
+                    </form>
+                </div>
+                <div className="p-5">
+                    <a href={process.env.NEXT_PUBLIC_URL + '/api/connect/github'} className="transition duration-200 cursor-pointer border border-gray-200 text-gray-500 w-full py-2.5 rounded-lg text-sm shadow-sm hover:shadow-md font-normal text-center inline-block">Login with Github</a>
+                </div>
+                <div className="py-5">
+                    <div className="grid grid-cols-2 gap-1">
+                        <div className="text-center sm:text-left whitespace-nowrap">
+                            <button className="transition duration-200 mx-5 px-5 py-4 cursor-pointer font-normal text-sm rounded-lg text-gray-500 hover:bg-gray-200 focus:outline-none focus:bg-gray-300 focus:ring-2 focus:ring-gray-400 focus:ring-opacity-50 ring-inset">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-4 h-4 inline-block align-text-top">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                                </svg>
+                                <Link href="/register"><a className="inline-block ml-1">Register Account</a></Link>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+6. membuat halaman dashboard.js
+
+import Router from 'next/router';
+import nookies from 'nookies';
+
+export async function getServerSideProps(ctx) {
+  const cookies = nookies.get(ctx);
+  
+  if(!cookies.token){
+      return {
+          redirect: {
+              destination: '/login'
+          }
+      }
+  }
+  
+  return {
+    props: {},
+  }
+}
+
+export default function Dashboard(){
+    function logoutHandler(e){
+        e.preventDefault();
+
+        nookies.destroy(null,'token');
+        Router.replace('/login');
+    }
+
+    return (
+        <div className="max-w-2xl mx-auto bg-white p-16 rounded">
+         <button type="submit" onClick={logoutHandler} className="relative -top-2 bg-red-500 hover:bg-red-600 transition ease-in text-white capitalize font-semibold text-lg rounded px-6 py-2">Logout</button>
+
+         <div id="accordion-collapse" data-accordion="collapse">
+            <h2 id="accordion-collapse-heading-1">
+               <button type="button" className="flex items-center focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-800 justify-between p-5 w-full font-medium text-left border border-gray-200 dark:border-gray-700 border-b-0 text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-t-xl" data-accordion-target="#accordion-collapse-body-1" aria-expanded="true" aria-controls="accordion-collapse-body-1">
+                  <span>What is Flowbite?</span>
+                  <svg data-accordion-icon className="w-6 h-6 shrink-0 rotate-180" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+               </button>
+            </h2>
+            <div id="accordion-collapse-body-1" aria-labelledby="accordion-collapse-heading-1">
+               <div className="p-5 border border-gray-200 dark:border-gray-700 dark:bg-gray-900 border-b-0">
+                  <p className="mb-2 text-gray-500 dark:text-gray-400">Flowbite is an open-source library of interactive
+                     components built on top of Tailwind CSS including buttons, dropdowns, modals, navbars, and more.</p>
+                  <p className="text-gray-500 dark:text-gray-400">Check out this guide to learn how to <a href="" target="_blank" className="text-blue-600 dark:text-blue-500 hover:underline">get started</a> and start developing
+                     websites even faster with components on top of Tailwind CSS.</p>
+               </div>
+            </div>
+            <h2 id="accordion-collapse-heading-2">
+               <button type="button" className="flex items-center focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-800 justify-between p-5 w-full font-medium border border-gray-200 dark:border-gray-700 border-b-0 text-left text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800" data-accordion-target="#accordion-collapse-body-2" aria-expanded="false" aria-controls="accordion-collapse-body-2">
+                  <span>Is there a Figma file available?</span>
+                  <svg data-accordion-icon className="w-6 h-6 shrink-0" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+               </button>
+            </h2>
+            <div id="accordion-collapse-body-2" className="hidden" aria-labelledby="accordion-collapse-heading-2">
+               <div className="p-5 border border-gray-200 dark:border-gray-700 border-b-0">
+                  <p className="mb-2 text-gray-500 dark:text-gray-400">Flowbite is first conceptualized and designed using the
+                     Figma software so everything you see in the library has a design equivalent in our Figma file.</p>
+                  <p className="text-gray-500 dark:text-gray-400">Check out the <a href="" target="_blank" className="text-blue-600 dark:text-blue-500 hover:underline">Figma design system</a>
+                     based on the utility classes from Tailwind CSS and components from Flowbite.</p>
+               </div>
+            </div>
+            <h2 id="accordion-collapse-heading-3">
+               <button type="button" className="flex items-center border focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-800 border-gray-200 dark:border-gray-700 justify-between p-5 w-full font-medium text-left text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800" data-accordion-target="#accordion-collapse-body-3" aria-expanded="false" aria-controls="accordion-collapse-body-3">
+                  <span>What are the differences between Flowbite and Tailwind UI?</span>
+                  <svg data-accordion-icon className="w-6 h-6 shrink-0" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+               </button>
+            </h2>
+            <div id="accordion-collapse-body-3" className="hidden" aria-labelledby="accordion-collapse-heading-3">
+               <div className="p-5 border border-gray-200 dark:border-gray-700 border-t-0">
+                  <p className="mb-2 text-gray-500 dark:text-gray-400">The main difference is that the core components from
+                     Flowbite are open source under the MIT license, whereas Tailwind UI is a paid product. Another
+                     difference is that Flowbite relies on smaller and standalone components, whereas Tailwind UI offers
+                     sections of pages.</p>
+                  <p className="mb-2 text-gray-500 dark:text-gray-400">However, we actually recommend using both Flowbite,
+                     Flowbite Pro, and even Tailwind UI as there is no technical reason stopping you from using the best
+                     of two worlds.</p>
+                  <p className="mb-2 text-gray-500 dark:text-gray-400">Learn more about these technologies:</p>
+                  <ul className="list-disc pl-5 dark:text-gray-400 text-gray-500">
+                     <li><a href="" target="_blank" className="text-blue-600 dark:text-blue-500 hover:underline">Flowbite Pro</a></li>
+                     <li><a href="" rel="nofollow" target="_blank" className="text-blue-600 dark:text-blue-500 hover:underline">Tailwind UI</a></li>
+                  </ul>
+               </div>
+            </div>
+         </div>
+         <p className="mt-5">This accordion component is part of a larger, open-source library of Tailwind CSS components. Learn
+            more
+            by going to the official <a className="text-blue-600 hover:underline" href="" target="_blank">Flowbite Documentation</a>.
+         </p>
+      </div>
+    );
+}
+
+7. membuat provider untuk login with github
+step by step
+- Pengguna membuka aplikasi frontend Anda (https://website.com) dan mengklik tombol Anda connect with Github.
+- Frontend mengarahkan ulang tab ke URL backend: https://strapi.website.com/api/connect/github.
+- Backend mengalihkan tab ke halaman login GitHub tempat pengguna login.
+- Setelah selesai, Github mengalihkan tab ke URL backend: https://strapi.website.com/api/connect/github/callback?code=abcdef.
+- Backend menggunakan yang diberikan codeuntuk mendapatkan dari Github dan access_tokenyang dapat digunakan untuk jangka waktu
+  tertentu untuk membuat permintaan resmi ke Github untuk mendapatkan info pengguna (email pengguna contoh).
+- Kemudian, backend mengarahkan ulang tab ke url pilihan Anda dengan
+  param access_token(contoh: http://website.com/connect/github/redirect?access_token=eyfvg)
+- Frontend ( http://website.com/connect/github/redirect) memanggil backend dengan
+  https://strapi.website.com/api/auth/github/callback?access_token=eyfvgyang mengembalikan profil pengguna strapi dengan jwt.
+  (Di bawah tenda, backend meminta Github untuk profil pengguna dan kecocokan dilakukan pada alamat email pengguna Github
+  dan alamat email pengguna Strapi)
+- Frontend sekarang memiliki user's jwt, yang berarti pengguna terhubung dan frontend dapat membuat permintaan yang
+  diautentikasi ke backend!
+
+1. buka github dan pergi ke @developer setting/oAuth Apps/new oAuth Apps untuk membuat oAuth baru
+2. isi application name: strapi auth jwt, homepage url: http://localhost:3000
+dan Authorization callback URL: http://localhost:1337/api/connect/github/callback
+3. kemudian buat generate a new client secret untuk mendapatkan secret
+4. setelah itu copy dan paste client ID dan secret nya ke admin strapi lalu buka @setting/providers/github
+5. ubah The redirect URL to your front-end app menjadi http://localhost:3000/auth/github untuk bikin request didalamnya ke strapi lagi
+6. lalu isi href dari tombol login with github yang ada di file login.js @href={process.env.NEXT_PUBLIC_URL + '/api/connect/github'}
+7. buat folder auth lalu buat file [provider].js untuk mendapatkan request dari strapi dengan user profile dan jwt
+
+{ params: { provider } = ctx.params.provider -> untuk mendapatkan provider seperti github,facebook,google
+query: { access_token } = ctx.query.access_token -> untuk mendapatkan token atau access_token nya
+...ctx = untuk mendapatkan response yang nanti dipake untuk set cookies
+
+import Router from 'next/router';
+import nookies from 'nookies';
+
+export async function getServerSideProps({ params: { provider }, query: { access_token }, ...ctx }) {
+    const req = await fetch(`${process.env.NEXT_PUBLIC_URL}/api/auth/${provider}/callback?access_token=${access_token}`);
+    const res = await req.json();
+    console.log(res);
+
+    if (res.jwt) {
+        nookies.set(ctx, 'token', res.jwt, {
+            path: '/' //supaya berlaku untuk semua path (default nya '/auth')
+        });
+
+        return {
+            redirect: {
+                destination: '/dashboard'
+            }
+        }
+    }
+
+    return {
+        props: {},
+    }
+}
+
+export default function Connect() {
+
+    function deleteToken(e) {
+        e.preventDefault();
+        nookies.destroy(null, 'token');
+        Router.replace('/login');
+    }
+
+    return (
+        <div>
+            <button type="reset" onClick={deleteToken}>Hapus token</button>
+        </div>
+    )
+}
